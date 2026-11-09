@@ -2313,15 +2313,15 @@ local touchAccessFrame = imgui.OnFrame(
 )
 touchAccessFrame.HideCursor = true
 
-local updaterDownloadSound
-local updaterDownloadSoundWarned = false
+updateStatus.downloadSound = nil
+updateStatus.downloadSoundWarned = false
 
-local function playUpdaterDownloadSound()
-    if not updaterDownloadSound then
+updateStatus.playDownloadSound = function()
+    if not updateStatus.downloadSound then
         local soundPath = joinPath(phoneSoundDirectory, "notify.wav")
         if type(doesFileExist) ~= "function" or not doesFileExist(soundPath) then
-            if not updaterDownloadSoundWarned then
-                updaterDownloadSoundWarned = true
+            if not updateStatus.downloadSoundWarned then
+                updateStatus.downloadSoundWarned = true
                 print("[PBRP Updater] Suara notifikasi tidak ditemukan: " .. soundPath)
             end
             return false
@@ -2329,32 +2329,32 @@ local function playUpdaterDownloadSound()
 
         local loaded, stream = pcall(loadAudioStream, soundPath)
         if not loaded or not stream or stream == 0 then
-            if not updaterDownloadSoundWarned then
-                updaterDownloadSoundWarned = true
+            if not updateStatus.downloadSoundWarned then
+                updateStatus.downloadSoundWarned = true
                 print("[PBRP Updater] Gagal memuat suara notifikasi: " .. tostring(stream))
             end
             return false
         end
-        updaterDownloadSound = stream
+        updateStatus.downloadSound = stream
     end
 
     local ok, err = pcall(function()
-        setAudioStreamVolume(updaterDownloadSound, 0.6)
-        setAudioStreamState(updaterDownloadSound, 0)
-        setAudioStreamState(updaterDownloadSound, 1)
+        setAudioStreamVolume(updateStatus.downloadSound, 0.6)
+        setAudioStreamState(updateStatus.downloadSound, 0)
+        setAudioStreamState(updateStatus.downloadSound, 1)
     end)
-    if not ok and not updaterDownloadSoundWarned then
-        updaterDownloadSoundWarned = true
+    if not ok and not updateStatus.downloadSoundWarned then
+        updateStatus.downloadSoundWarned = true
         print("[PBRP Updater] Gagal memutar suara notifikasi: " .. tostring(err))
     end
     return ok
 end
 
-local lastUpdaterNotice = ""
+updateStatus.lastNotice = ""
 updateStatus.notice = function(message)
     local text = "[PBRP Updater] " .. tostring(message)
-    if text ~= lastUpdaterNotice then
-        lastUpdaterNotice = text
+    if text ~= updateStatus.lastNotice then
+        updateStatus.lastNotice = text
         print(text)
         if isSampAvailable() then
             sampAddChatMessage(text, 0xFFD4AF37)
@@ -2362,7 +2362,7 @@ updateStatus.notice = function(message)
     end
 end
 
-local function setUpdaterStatus(title, detail)
+updateStatus.setStatus = function(title, detail)
     updateStatus.active = true
     updateStatus.visible = title ~= "Memeriksa GitHub"
     updateStatus.title = title
@@ -2370,7 +2370,7 @@ local function setUpdaterStatus(title, detail)
     updateStatus.finishedAt = 0
 end
 
-local function finishUpdaterStatus(title, detail)
+updateStatus.finishStatus = function(title, detail)
     updateStatus.title = title
     updateStatus.detail = detail or ""
     updateStatus.active = false
@@ -2381,14 +2381,14 @@ local function finishUpdaterStatus(title, detail)
     end
 end
 
-local function updaterFileExists(path)
+updateStatus.fileExists = function(path)
     local file = io.open(path, "rb")
     if not file then return false end
     file:close()
     return true
 end
 
-local function readUpdaterFile(path)
+updateStatus.readFile = function(path)
     local file = io.open(path, "rb")
     if not file then return nil, "file tidak ditemukan atau tidak dapat dibuka" end
 
@@ -2402,7 +2402,7 @@ local function readUpdaterFile(path)
     return content
 end
 
-local function fetchUpdaterResponse(url)
+updateStatus.fetchResponse = function(url)
     local errors = {}
     local lastBody, lastStatus
 
@@ -2553,7 +2553,7 @@ local function fetchUpdaterResponse(url)
     return nil, nil, "semua API HTTP gagal: " .. table.concat(errors, "; ")
 end
 
-local function saveUpdaterContent(path, content)
+updateStatus.saveContent = function(path, content)
     local file, openError = io.open(path, "wb")
     if not file then return false, tostring(openError) end
     local wrote, writeError = file:write(content)
@@ -2565,7 +2565,7 @@ local function saveUpdaterContent(path, content)
     return true
 end
 
-local function downloadUpdaterFile(url, path, validate, fallbackUrls)
+updateStatus.downloadFile = function(url, path, validate, fallbackUrls)
     local okMoonloader, moonloader = pcall(require, "moonloader")
     local downloadStatus = okMoonloader and type(moonloader) == "table"
         and moonloader.download_status or nil
@@ -2584,11 +2584,11 @@ local function downloadUpdaterFile(url, path, validate, fallbackUrls)
                 local attemptNumber = (urlIndex - 1) * maxAttempts + attempt
                 local attemptPath = path .. ".attempt-" .. attemptNumber
                 os.remove(attemptPath)
-                local content, status, fetchError = fetchUpdaterResponse(currentUrl)
+                local content, status, fetchError = updateStatus.fetchResponse(currentUrl)
                 if type(content) ~= "string" or status ~= 200 then
                     lastError = fetchError or ("respons HTTP " .. tostring(status or "tidak valid"))
                 else
-                    local saved, saveError = saveUpdaterContent(attemptPath, content)
+                    local saved, saveError = updateStatus.saveContent(attemptPath, content)
                     if not saved then
                         lastError = saveError
                     else
@@ -2673,7 +2673,7 @@ local function downloadUpdaterFile(url, path, validate, fallbackUrls)
                 elseif not success then
                     lastError = "unduhan timeout"
                 else
-                    local content, readError = readUpdaterFile(attemptPath)
+                    local content, readError = updateStatus.readFile(attemptPath)
                     if not content then
                         lastError = readError
                     elseif content == "" then
@@ -2699,7 +2699,7 @@ local function downloadUpdaterFile(url, path, validate, fallbackUrls)
                             os.remove(path)
                             local moved, moveError = os.rename(attemptPath, path)
                             if moved then
-                                local savedContent, savedError = readUpdaterFile(path)
+                                local savedContent, savedError = updateStatus.readFile(path)
                                 if savedContent == content then
                                     updateStatus.currentBytes = #savedContent
                                     return true, nil, savedContent
@@ -2718,7 +2718,7 @@ local function downloadUpdaterFile(url, path, validate, fallbackUrls)
             os.remove(attemptPath)
             if attemptNumber < totalAttempts then
                 local host = currentUrl:match("^https?://([^/]+)") or "server"
-                setUpdaterStatus("Mengulangi unduhan", string.format(
+                updateStatus.setStatus("Mengulangi unduhan", string.format(
                     "Percobaan %d/%d via %s", attemptNumber + 1, totalAttempts, host))
                 wait(500 * attemptNumber)
             end
@@ -2869,7 +2869,7 @@ end
 updateStatus.check = function()
     if not scriptDirectory then
         updateStatus.notice("Lokasi script tidak dapat ditentukan; update dibatalkan.")
-        finishUpdaterStatus("Update gagal", "Lokasi script tidak dapat ditentukan.")
+        updateStatus.finishStatus("Update gagal", "Lokasi script tidak dapat ditentukan.")
         return
     end
 
@@ -2884,8 +2884,8 @@ updateStatus.check = function()
     local atomCommitUrl = "https://github.com/" .. UPDATE_CONFIG.owner .. "/"
         .. UPDATE_CONFIG.repository .. "/commits/" .. UPDATE_CONFIG.branch .. ".atom"
 
-    setUpdaterStatus("Memeriksa GitHub", UPDATE_CONFIG.repository .. "/" .. UPDATE_CONFIG.branch)
-    local downloaded, downloadError, commitBody = downloadUpdaterFile(commitUrl, commitPath, function(_, content)
+    updateStatus.setStatus("Memeriksa GitHub", UPDATE_CONFIG.repository .. "/" .. UPDATE_CONFIG.branch)
+    local downloaded, downloadError, commitBody = updateStatus.downloadFile(commitUrl, commitPath, function(_, content)
         if content:match('"sha"%s*:%s*"[%x]+"')
             or content:match("Grit::Commit/[%x]+") then
             return true
@@ -2895,7 +2895,7 @@ updateStatus.check = function()
     if not downloaded then
         updateStatus.removeFiles(temporaryPaths)
         updateStatus.notice("Tidak bisa memeriksa GitHub: " .. tostring(downloadError))
-        finishUpdaterStatus("Pemeriksaan gagal", tostring(downloadError))
+        updateStatus.finishStatus("Pemeriksaan gagal", tostring(downloadError))
         return
     end
 
@@ -2905,19 +2905,19 @@ updateStatus.check = function()
     if not commit then
         updateStatus.removeFiles(temporaryPaths)
         updateStatus.notice("Respons GitHub tidak berisi commit yang valid.")
-        finishUpdaterStatus("Pemeriksaan gagal", "Respons GitHub tidak berisi commit yang valid.")
+        updateStatus.finishStatus("Pemeriksaan gagal", "Respons GitHub tidak berisi commit yang valid.")
         return
     end
 
-    local installedCommit = readUpdaterFile(statePath)
+    local installedCommit = updateStatus.readFile(statePath)
     local sameCommit = installedCommit and installedCommit:match("^([%x]+)") == commit
 
-    setUpdaterStatus("Memeriksa daftar file", "Commit " .. commit:sub(1, 7))
+    updateStatus.setStatus("Memeriksa daftar file", "Commit " .. commit:sub(1, 7))
     local manifestUrl = prefix .. commit .. "/update-manifest.txt"
     local cdnPrefix = "https://cdn.jsdelivr.net/gh/" .. UPDATE_CONFIG.owner .. "/"
         .. UPDATE_CONFIG.repository .. "@" .. commit .. "/"
     local manifest
-    downloaded, downloadError, manifest = downloadUpdaterFile(manifestUrl, manifestPath, function(_, content)
+    downloaded, downloadError, manifest = updateStatus.downloadFile(manifestUrl, manifestPath, function(_, content)
         local foundMainScript = false
         for line in content:gmatch("[^\r\n]+") do
             local relativePath = line:match("^%s*(.-)%s*$")
@@ -2941,14 +2941,14 @@ updateStatus.check = function()
     if not downloaded then
         updateStatus.removeFiles(temporaryPaths)
         updateStatus.notice("Tidak bisa mengunduh manifest: " .. tostring(downloadError))
-        finishUpdaterStatus("Update gagal", "Manifest: " .. tostring(downloadError))
+        updateStatus.finishStatus("Update gagal", "Manifest: " .. tostring(downloadError))
         return
     end
 
     if not manifest then
         updateStatus.removeFiles(temporaryPaths)
         updateStatus.notice("Manifest update tidak dapat dibaca.")
-        finishUpdaterStatus("Update gagal", "Manifest update tidak dapat dibaca.")
+        updateStatus.finishStatus("Update gagal", "Manifest update tidak dapat dibaca.")
         return
     end
 
@@ -2964,7 +2964,7 @@ updateStatus.check = function()
             end
             if not updateStatus.isAllowedPath(relativePath) then
                 updateStatus.notice("Path di manifest ditolak: " .. relativePath)
-                finishUpdaterStatus("Update dibatalkan", "Path manifest ditolak: " .. relativePath)
+                updateStatus.finishStatus("Update dibatalkan", "Path manifest ditolak: " .. relativePath)
                 return
             end
             if not seenPaths[relativePath] then
@@ -2975,7 +2975,7 @@ updateStatus.check = function()
     end
     if #files == 0 or not seenPaths["uijtrp.lua"] then
         updateStatus.notice("Manifest kosong atau tidak menyertakan uijtrp.lua.")
-        finishUpdaterStatus("Update dibatalkan", "Manifest harus menyertakan uijtrp.lua.")
+        updateStatus.finishStatus("Update dibatalkan", "Manifest harus menyertakan uijtrp.lua.")
         return
     end
 
@@ -2984,7 +2984,7 @@ updateStatus.check = function()
         for _, relativePath in ipairs(files) do
             local localPath = relativePath:gsub("/", PATH_SEPARATOR)
             local destination = joinPath(scriptDirectory, localPath)
-            local content = readUpdaterFile(destination)
+            local content = updateStatus.readFile(destination)
             local needsRepair = not content or content == ""
             if not needsRepair and relativePath:lower():match("%.lua$") then
                 local compiled = loadfile(destination)
@@ -3000,7 +3000,7 @@ updateStatus.check = function()
         files = repairFiles
         if #files == 0 then
             print("[PBRP Updater] Script sudah versi terbaru.")
-            finishUpdaterStatus("Versi terbaru", "Tidak ada file yang perlu diunduh.")
+            updateStatus.finishStatus("Versi terbaru", "Tidak ada file yang perlu diunduh.")
             return
         end
         updateStatus.notice(string.format("%d file hilang atau tidak terbaca; akan diunduh ulang.", #files))
@@ -3021,18 +3021,18 @@ updateStatus.check = function()
         if not directoryReady then
             updateStatus.removeFiles(stagedPaths)
             updateStatus.notice("Folder tujuan gagal disiapkan untuk " .. relativePath .. ": " .. directoryError)
-            finishUpdaterStatus("Pemasangan gagal", relativePath .. ": " .. directoryError)
+            updateStatus.finishStatus("Pemasangan gagal", relativePath .. ": " .. directoryError)
             return
         end
 
         updateStatus.currentBytes = 0
-        setUpdaterStatus("Mengunduh file", string.format("%d/%d  %s", index, #files, relativePath))
+        updateStatus.setStatus("Mengunduh file", string.format("%d/%d  %s", index, #files, relativePath))
         if not downloadSoundPlayed then
-            playUpdaterDownloadSound()
+            updateStatus.playDownloadSound()
             downloadSoundPlayed = true
         end
         os.remove(temporary)
-        downloaded, downloadError = downloadUpdaterFile(sourceUrl, temporary, function(path, content)
+        downloaded, downloadError = updateStatus.downloadFile(sourceUrl, temporary, function(path, content)
             if relativePath:lower():match("%.lua$") then
                 local compiled, compileError = loadfile(path)
                 return compiled ~= nil, compileError
@@ -3043,7 +3043,7 @@ updateStatus.check = function()
             updateStatus.removeFiles(stagedPaths)
             os.remove(temporary)
             updateStatus.notice("Gagal mengunduh " .. relativePath .. ": " .. tostring(downloadError))
-            finishUpdaterStatus("Unduhan gagal", relativePath .. ": " .. tostring(downloadError))
+            updateStatus.finishStatus("Unduhan gagal", relativePath .. ": " .. tostring(downloadError))
             return
         end
 
@@ -3052,19 +3052,19 @@ updateStatus.check = function()
             destination = destination,
             temporary = temporary,
             backup = backup,
-            hadOriginal = updaterFileExists(destination),
+            hadOriginal = updateStatus.fileExists(destination),
         }
         stagedPaths[#stagedPaths + 1] = temporary
         updateStatus.completed = index
     end
 
-    setUpdaterStatus("Memasang update", string.format("%d file", #files))
+    updateStatus.setStatus("Memasang update", string.format("%d file", #files))
     local stateTemporary = statePath .. ".tmp"
     local stateFile, stateError = io.open(stateTemporary, "wb")
     if not stateFile then
         updateStatus.removeFiles(stagedPaths)
         updateStatus.notice("Tidak bisa menyimpan versi update: " .. tostring(stateError))
-        finishUpdaterStatus("Pemasangan gagal", tostring(stateError))
+        updateStatus.finishStatus("Pemasangan gagal", tostring(stateError))
         return
     end
     local wroteState, writeError = stateFile:write(commit, "\n")
@@ -3073,7 +3073,7 @@ updateStatus.check = function()
         os.remove(stateTemporary)
         updateStatus.removeFiles(stagedPaths)
         updateStatus.notice("Tidak bisa menulis versi update: " .. tostring(writeError or closeError))
-        finishUpdaterStatus("Pemasangan gagal", tostring(writeError or closeError))
+        updateStatus.finishStatus("Pemasangan gagal", tostring(writeError or closeError))
         return
     end
     staged[#staged + 1] = {
@@ -3081,7 +3081,7 @@ updateStatus.check = function()
         destination = statePath,
         temporary = stateTemporary,
         backup = statePath .. ".bak",
-        hadOriginal = updaterFileExists(statePath),
+        hadOriginal = updateStatus.fileExists(statePath),
     }
 
     local applied = {}
@@ -3094,7 +3094,7 @@ updateStatus.check = function()
                 updateStatus.removeFiles(stagedPaths)
                 os.remove(stateTemporary)
                 updateStatus.notice("Tidak bisa membuat backup " .. item.relativePath .. ": " .. tostring(backupError))
-                finishUpdaterStatus("Pemasangan gagal", "Backup gagal: " .. item.relativePath)
+                updateStatus.finishStatus("Pemasangan gagal", "Backup gagal: " .. item.relativePath)
                 return
             end
         end
@@ -3111,7 +3111,7 @@ updateStatus.check = function()
             updateStatus.removeFiles(stagedPaths)
             os.remove(stateTemporary)
             updateStatus.notice("Tidak bisa memasang " .. item.relativePath .. ": " .. tostring(installError))
-            finishUpdaterStatus("Pemasangan gagal", "Gagal mengganti " .. item.relativePath)
+            updateStatus.finishStatus("Pemasangan gagal", "Gagal mengganti " .. item.relativePath)
             return
         end
         applied[#applied + 1] = item
@@ -3121,7 +3121,7 @@ updateStatus.check = function()
         if item.hadOriginal then os.remove(item.backup) end
     end
     updateStatus.notice("Update GitHub berhasil. Script akan dimuat ulang.")
-    finishUpdaterStatus("Update selesai", string.format("%d file terpasang. Memuat ulang...", #files))
+    updateStatus.finishStatus("Update selesai", string.format("%d file terpasang. Memuat ulang...", #files))
     wait(1000)
     thisScript():reload()
 end
@@ -3276,7 +3276,7 @@ function main()
                             updateCheckRunning = false
                             if not ok then
                                 updateStatus.notice("Pemeriksaan update gagal: " .. tostring(updateError))
-                                finishUpdaterStatus("Update gagal", tostring(updateError))
+                                updateStatus.finishStatus("Update gagal", tostring(updateError))
                             end
                             local retryableStatuses = {
                                 ["Pemeriksaan gagal"] = true,
