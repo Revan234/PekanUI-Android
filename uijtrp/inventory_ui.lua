@@ -1032,13 +1032,13 @@ return function(imgui, icons, V2, color, accent, getAccent, sendChat, uiSounds, 
                 imgui.SetCursorScreenPos(V2(p.x + 64, p.y + 8))
                 imgui.TextColored(WHITE, selectedShopItem.name)
                 imgui.SetCursorScreenPos(V2(p.x + 64, p.y + 32))
-                imgui.TextColored(GRAY, string.format("Rp %s per item", formatRupiah(selectedShopItem.price * 15000)))
+                imgui.TextColored(GRAY, string.format("Rp %s per item", formatRupiah(selectedShopItem.price)))
 
                 imgui.InputInt("Jumlah##shop_amount", shopAmount, 1, 10)
                 if shopAmount[0] < 1 then shopAmount[0] = 1 end
                 if shopAmount[0] > 100 then shopAmount[0] = 100 end
                 imgui.TextColored(GRAY,
-                    string.format("Total: Rp %s", formatRupiah(selectedShopItem.price * shopAmount[0] * 15000)))
+                    string.format("Total: Rp %s", formatRupiah(selectedShopItem.price * shopAmount[0])))
                 if styledButton("BELI##shop_buy", -1, 38, "accent") then
                     sendChat(string.format("/rpui_shop_buy %d %d",
                         selectedShopItem.index, shopAmount[0]))
@@ -1056,7 +1056,7 @@ return function(imgui, icons, V2, color, accent, getAccent, sendChat, uiSounds, 
             for _, entry in ipairs(shopItems) do
                 local selected = selectedShopItem == entry
                 local label = string.format("%s  -  Rp %s##shop_item_%d",
-                    entry.name, formatRupiah(entry.price * 15000), entry.index)
+                    entry.name, formatRupiah(entry.price), entry.index)
                 if styledButton(label, -1, 38, selected and "accent" or "glass") then
                     selectedShopItem = entry
                     shopAmount[0] = 1

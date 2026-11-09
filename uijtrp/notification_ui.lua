@@ -18,7 +18,6 @@ local NOTIFY = {
     -- Teks yang tidak pernah dianggap notifikasi (HUD statis, angka, dll)
     ignore = {
         "^[%d%p%s]*$",                       -- hanya angka / simbol
-        "^%$[%d,%.]+$",
         "^rp[%s%.]*[%d,%.]+$",
         "km/?h", "mph", "fuel", "bensin",
     },

@@ -828,7 +828,7 @@ return function(imgui, V2, ffi, sendChat, isPlayerUiReady, logoPath)
 
     local frame = imgui.OnFrame(
         function() return open and level >= 1 and isSampAvailable() and isPlayerUiReady() end, draw)
-    frame.LockPlayer = true
+    frame.LockPlayer = false
 
     return {
         open = function()

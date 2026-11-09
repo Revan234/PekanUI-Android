@@ -2369,7 +2369,9 @@ return function(imgui, icons, V2, ffi, photoMedia, sendChat, uiSounds, isPlayerU
     end
 
     local function money(value)
-        return "$" .. tostring(math.floor(tonumber(value) or 0))
+        local amount = math.floor(tonumber(value) or 0)
+        local digits = tostring(math.abs(amount)):reverse():gsub("(%d%d%d)", "%1."):reverse():gsub("%.$", "")
+        return "Rp " .. (amount < 0 and "-" or "") .. digits
     end
 
     pages.information = function()
@@ -3053,7 +3055,7 @@ return function(imgui, icons, V2, ffi, photoMedia, sendChat, uiSounds, isPlayerU
         function(self)
             -- kursor hanya tampil saat HP benar-benar terbuka (bukan saat mengintip)
             pcall(function() self.HideCursor = not open end)
-            self.LockPlayer = open
+            self.LockPlayer = false
             updateAccentPalette()
             local now = os.clock()
             local dt = math.min(0.05, now - (A.last > 0 and A.last or now))

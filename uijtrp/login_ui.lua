@@ -9,8 +9,8 @@ return function(imgui, V2, ffi, soundPath, uiSounds, logoPath)
         error = imgui.ImVec4(1, 0.39, 0.42, 1),
     }
 
-    local LOGIN_DIALOG_ID = 2
-    local dialogId, accountName, loginError
+    local VERIFY_DIALOG_ID, LOGIN_DIALOG_ID, REGISTER_DIALOG_ID = 0, 2, 3
+    local dialogId, dialogMode, accountName, loginError
     local password = imgui.new.char[129]()
     local open = false
     local openedAt = 0
@@ -85,7 +85,7 @@ return function(imgui, V2, ffi, soundPath, uiSounds, logoPath)
         ffi.fill(password, ffi.sizeof(password), 0)
         lastPasswordValue = ""
         lastTypeSoundAt = 0
-        dialogId, accountName, loginError, open = nil, "", nil, false
+        dialogId, dialogMode, accountName, loginError, open = nil, nil, "", nil, false
         if frame then frame.HideCursor = true end
     end
 
@@ -93,12 +93,14 @@ return function(imgui, V2, ffi, soundPath, uiSounds, logoPath)
         if not dialogId then return end
         if button == 1 then playFeedback("click") end
         if button == 1 and ffi.string(password) == "" then
-            loginError = "Masukkan kata sandi terlebih dahulu."
+            loginError = dialogMode == "verify"
+                and "Masukkan PIN verifikasi terlebih dahulu."
+                or "Masukkan kata sandi terlebih dahulu."
             return
         end
         if type(sampSendDialogResponse) ~= "function" then
-            loginError = "API login Lua tidak tersedia. Coba muat ulang dialog."
-            sampAddChatMessage("[PBRP/PKU UI] API respons dialog login tidak tersedia.", 0xFFFF6A6A)
+            loginError = "API dialog Lua tidak tersedia. Coba muat ulang dialog."
+            sampAddChatMessage("[PBRP/PKU UI] API respons dialog akun tidak tersedia.", 0xFFFF6A6A)
             return
         end
 
@@ -106,24 +108,32 @@ return function(imgui, V2, ffi, soundPath, uiSounds, logoPath)
         local input = button == 1 and ffi.string(password) or ""
         local ok, err = pcall(sampSendDialogResponse, id, button, -1, input)
         if not ok then
-            loginError = "Gagal mengirim login. Silakan coba lagi."
-            sampAddChatMessage("[PBRP/PKU UI] Gagal mengirim respons login: " .. tostring(err), 0xFFFF6A6A)
+            loginError = "Gagal mengirim respons. Silakan coba lagi."
+            sampAddChatMessage("[PBRP/PKU UI] Gagal mengirim respons dialog akun: " .. tostring(err), 0xFFFF6A6A)
             return
         end
         reset()
     end
 
     local function onShowDialog(id, style, title, button1, button2, text)
-        if id ~= LOGIN_DIALOG_ID or style ~= 3
-            or not isSampAvailable()
-            or type(sampSendDialogResponse) ~= "function" then
+        if not isSampAvailable() or type(sampSendDialogResponse) ~= "function" then
+            return nil
+        end
+
+        if id == VERIFY_DIALOG_ID and style == 1 then
+            dialogMode = "verify"
+        elseif id == LOGIN_DIALOG_ID and style == 3 then
+            dialogMode = "login"
+        elseif id == REGISTER_DIALOG_ID and style == 3 then
+            dialogMode = "register"
+        else
             return nil
         end
 
         local contents = cleanText(text)
         accountName = contents:match("Nama UCP:%s*([^\n]+)") or ""
         accountName = accountName:match("^%s*(.-)%s*$")
-        loginError = contents:match("Error:%s*([^\n]+)")
+        loginError = contents:match("[Ee][Rr][Rr][Oo][Rr]:%s*([^\n]+)")
         if loginError then loginError = loginError:match("^%s*(.-)%s*$") end
         dialogId = id
         open = true
@@ -137,18 +147,15 @@ return function(imgui, V2, ffi, soundPath, uiSounds, logoPath)
 
     local function draw()
         local display = imgui.GetIO().DisplaySize
-        local width = math.min(470, display.x - 32)
-        local height = math.min(350, display.y - 32)
-        if width < 320 or height < 300 then
-            width, height = math.max(280, display.x - 16), math.max(270, display.y - 16)
-        end
+        local width = math.max(280, math.min(420, display.x - 32))
+        local height = math.max(320, math.min(620, display.y - 32))
 
         local elapsed = math.max(0, os.clock() - openedAt)
         local progress = math.min(1, elapsed / 0.48)
         local eased = 1 - (1 - progress) * (1 - progress) * (1 - progress)
         local alpha = math.min(1, progress * 1.8)
         local slide = (1 - eased) * 28
-        imgui.SetNextWindowPos(V2((display.x - width) / 2, (display.y - height) / 2 + slide), imgui.Cond.Always)
+        imgui.SetNextWindowPos(V2(display.x - width - 24 + slide, 24), imgui.Cond.Always)
         imgui.SetNextWindowSize(V2(width, height), imgui.Cond.Always)
         imgui.PushStyleVarFloat(imgui.StyleVar.Alpha, alpha)
         imgui.PushStyleVarFloat(imgui.StyleVar.WindowRounding, 16)
@@ -212,27 +219,47 @@ return function(imgui, V2, ffi, soundPath, uiSounds, logoPath)
         imgui.SetCursorPos(V2(heroX, 56))
         imgui.TextColored(P.muted, "ROLEPLAY")
 
+        local heading = dialogMode == "verify" and "VERIFIKASI UCP"
+            or dialogMode == "register" and "BUAT PASSWORD"
+            or "LOGIN SERVER"
+        local welcome = dialogMode == "verify" and "Verifikasi akun Anda"
+            or dialogMode == "register" and "Minimal 6 karakter; huruf, angka, _ [ ] ( )."
+            or "Selamat datang kembali"
+        local fieldLabel = dialogMode == "verify" and "PIN verifikasi"
+            or "Kata sandi"
+        local fieldHint = dialogMode == "verify" and "Masukkan PIN dari Discord"
+            or dialogMode == "register" and "Buat kata sandi baru"
+            or "Masukkan kata sandi"
+        local submitLabel = dialogMode == "verify" and "VERIFIKASI  >##PBRP_login"
+            or dialogMode == "register" and "BUAT PASSWORD  >##PBRP_login"
+            or "MASUK  >##PBRP_login"
+
         imgui.SetCursorPos(V2(24, 104))
-        imgui.TextColored(imgui.ImVec4(1, 0.72, 0.75, 1), "LOGIN SERVER")
+        imgui.TextColored(imgui.ImVec4(1, 0.72, 0.75, 1), heading)
         imgui.SetCursorPos(V2(24, 134))
-        imgui.Text("Selamat datang kembali")
+        imgui.Text(welcome)
         imgui.SetCursorPos(V2(24, 160))
-        imgui.TextColored(P.muted, accountName ~= "" and accountName or "Masukkan kata sandi akun Anda")
+        imgui.TextColored(P.muted, accountName ~= "" and accountName or "Akun PekanBaru Roleplay")
 
         drawList:AddRectFilled(V2(pos.x + 24, pos.y + 182), V2(pos.x + size.x - 24, pos.y + 183),
             colorU32(imgui.ImVec4(1, 1, 1, 0.07)))
 
+        local fieldLabelY = math.max(196, height - 296)
+        imgui.SetCursorPos(V2(24, fieldLabelY))
         if loginError and loginError ~= "" then
-            imgui.SetCursorPos(V2(24, 196))
             imgui.TextColored(P.error, loginError)
         else
-            imgui.SetCursorPos(V2(24, 196))
-            imgui.TextColored(P.muted, "Kata sandi")
+            imgui.TextColored(P.muted, fieldLabel)
         end
 
-        imgui.SetCursorPos(V2(24, 222))
-        local inputFlags = imgui.InputTextFlags.Password + imgui.InputTextFlags.EnterReturnsTrue
-        local enterPressed = imgui.InputTextWithHint("##PBRP_login_password", "Masukkan kata sandi",
+        imgui.SetCursorPos(V2(24, fieldLabelY + 28))
+        local inputFlags = imgui.InputTextFlags.EnterReturnsTrue
+        if dialogMode == "verify" then
+            inputFlags = inputFlags + imgui.InputTextFlags.CharsDecimal
+        else
+            inputFlags = inputFlags + imgui.InputTextFlags.Password
+        end
+        local enterPressed = imgui.InputTextWithHint("##PBRP_login_password", fieldHint,
             password, ffi.sizeof(password), inputFlags)
         local passwordValue = ffi.string(password)
         if passwordValue ~= lastPasswordValue
@@ -242,17 +269,20 @@ return function(imgui, V2, ffi, soundPath, uiSounds, logoPath)
         end
         lastPasswordValue = passwordValue
 
-        imgui.SetCursorPos(V2(24, size.y - 73))
+        imgui.SetCursorPos(V2(24, size.y - 82))
         if imgui.Button("KELUAR##PBRP_login", V2(112, 42)) then
             respond(0)
         end
         imgui.SameLine(0, 12)
-        local submitClicked = imgui.Button("MASUK  >##PBRP_login", V2(size.x - 172, 42))
+        local submitClicked = imgui.Button(submitLabel, V2(size.x - 172, 42))
         if submitClicked or enterPressed then
             respond(1)
         end
-        imgui.SetCursorPos(V2(24, size.y - 23))
-        imgui.TextColored(P.muted, "KONEKSI AMAN  /  PEKANBARU ROLEPLAY")
+        imgui.SetCursorPos(V2(24, size.y - 26))
+        local footer = dialogMode == "verify" and "PIN DIKIRIM MELALUI DISCORD"
+            or dialogMode == "register" and "PASSWORD AKAN DIGUNAKAN UNTUK LOGIN UCP"
+            or "KONEKSI AMAN  /  PEKANBARU ROLEPLAY"
+        imgui.TextColored(P.muted, footer)
 
         imgui.End()
         imgui.PopStyleColor(11)
@@ -262,7 +292,7 @@ return function(imgui, V2, ffi, soundPath, uiSounds, logoPath)
     frame = imgui.OnFrame(
         function() return open and isSampAvailable() end,
         draw)
-    frame.LockPlayer = true
+    frame.LockPlayer = false
     frame.HideCursor = true
 
     return {

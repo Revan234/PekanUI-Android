@@ -163,7 +163,7 @@ return function(imgui, V2, isPlayerUiReady)
     frame = imgui.OnFrame(
         function() return open and isSampAvailable() and isPlayerUiReady() end,
         draw)
-    frame.LockPlayer = true
+    frame.LockPlayer = false
     frame.HideCursor = true
 
     return {

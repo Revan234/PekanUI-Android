@@ -157,18 +157,15 @@ return function(imgui, V2, musicPath)
 
     local function draw()
         local display = imgui.GetIO().DisplaySize
-        local width = math.min(820, display.x - 32)
-        local height = math.min(570, display.y - 32)
-        if width < 440 or height < 400 then
-            width, height = math.max(320, display.x - 16), math.max(340, display.y - 16)
-        end
+        local width = math.max(320, math.min(500, display.x - 32))
+        local height = math.max(360, math.min(800, display.y - 32))
 
         local elapsed = math.max(0, os.clock() - openedAt)
         local progress = math.min(1, elapsed / 0.55)
         local eased = 1 - (1 - progress) * (1 - progress) * (1 - progress)
         local alpha = math.min(1, progress * 1.8)
         local slide = (1 - eased) * 32
-        imgui.SetNextWindowPos(V2((display.x - width) / 2, (display.y - height) / 2 + slide), imgui.Cond.Always)
+        imgui.SetNextWindowPos(V2(display.x - width - 24 + slide, 24), imgui.Cond.Always)
         imgui.SetNextWindowSize(V2(width, height), imgui.Cond.Always)
         imgui.PushStyleVarFloat(imgui.StyleVar.Alpha, alpha)
         imgui.PushStyleVarFloat(imgui.StyleVar.WindowRounding, 16)
@@ -294,7 +291,7 @@ return function(imgui, V2, musicPath)
     frame = imgui.OnFrame(
         function() return open and isSampAvailable() end,
         draw)
-    frame.LockPlayer = true
+    frame.LockPlayer = false
     frame.HideCursor = true
 
     return {

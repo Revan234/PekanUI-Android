@@ -17,6 +17,7 @@ uijtrp/mechanic_service_ui.lua
 uijtrp/notification_ui.lua
 uijtrp/phone_media.lua
 uijtrp/phone_ui.lua
+uijtrp/personal_data_ui.lua
 uijtrp/speedometer.lua
 uijtrp/td_reader.lua
 uijtrp/ui_sounds.lua

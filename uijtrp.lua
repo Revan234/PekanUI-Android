@@ -504,6 +504,10 @@ loginUI.characterSelect = loadFactory("uijtrp.character_select_ui", stubModule({
     onShowDialog = function() return nil end, isOpen = function() return false end,
     reset = noop,
 }), imgui, V2, joinPath(assetDirectory, "sound", "f2383602-54e8-4e0b-b171-eec9722a328f.wav"))
+loginUI.personalDataUI = loadFactory("uijtrp.personal_data_ui", stubModule({
+    onShowDialog = function() return nil end, isOpen = function() return false end,
+    reset = noop,
+}), imgui, V2, ffi)
 local notificationUI = loadFactory("uijtrp.notification_ui", stubModule(),
     imgui, V2, isPlayerUiReady, uiSounds)
 notificationUI.setInventoryOwner(inventoryUI.ownsTextdraw)
@@ -547,6 +551,7 @@ chainInventoryTextdrawEvent("onShowDialog", mechanicServiceUI.onShowDialog)
 chainInventoryTextdrawEvent("onShowDialog", businessUI.onShowDialog)
 chainInventoryTextdrawEvent("onShowDialog", loginUI.onShowDialog)
 chainInventoryTextdrawEvent("onShowDialog", loginUI.characterSelect.onShowDialog)
+chainInventoryTextdrawEvent("onShowDialog", loginUI.personalDataUI.onShowDialog)
 
 local loadingUI = loadFactory("uijtrp.loading_screen", stubModule(),
     imgui, V2, joinPath(assetDirectory, "jtrp_loading.png"))
@@ -703,6 +708,7 @@ end
 chainLoadingEvent("onConnectionClosed", function()
     loginUI.reset()
     loginUI.characterSelect.reset()
+    loginUI.personalDataUI.reset()
 end)
 
 local function radialAction(item)
@@ -758,7 +764,7 @@ local adminFrame
 adminFrame = imgui.OnFrame(
     function() return adminOpen[0] and canUseAdminUi() and isSampAvailable() and isPlayerUiReady() end,
     function()
-        adminFrame.LockPlayer = adminOpen[0]
+        adminFrame.LockPlayer = false
         local display = imgui.GetIO().DisplaySize
         local width = math.min(800, display.x - 32)
         local height = math.min(650, display.y - 32)
@@ -1389,7 +1395,7 @@ menuFrame = imgui.OnFrame(
         local dt = imgui.GetIO().DeltaTime
         menuAnim = approach(menuAnim, menuOpen[0] and 1 or 0, 11, dt)
         updateHudMetrics(dt)
-        menuFrame.LockPlayer = menuOpen[0]
+        menuFrame.LockPlayer = false
         local ease = smooth(menuAnim)
         curAlpha = ease
 
@@ -1571,29 +1577,6 @@ menuFrame = imgui.OnFrame(
         curAlpha = 1.0
     end
 )
-
-local touchToggleFrame = imgui.OnFrame(
-    function()
-        return isSampAvailable() and isPlayerUiReady() and not menuOpen[0]
-            and not radialOpen[0] and not adminOpen[0] and menuAnim <= 0.01
-    end,
-    function()
-        local display = imgui.GetIO().DisplaySize
-        local width, height = 82, 46
-        imgui.SetNextWindowPos(V2(math.max(8, display.x - width - 12), math.max(8, display.y * 0.16)),
-            imgui.Cond.Always)
-        imgui.SetNextWindowSize(V2(width, height), imgui.Cond.Always)
-        imgui.SetNextWindowBgAlpha(0.82)
-        local flags = imgui.WindowFlags.NoDecoration + imgui.WindowFlags.NoMove
-            + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoSavedSettings
-        imgui.Begin("##pbrp_android_touch_toggle", nil, flags)
-        if imgui.Button("PBRP UI", V2(width - 8, height - 8)) then
-            toggleMenu()
-        end
-        imgui.End()
-    end
-)
-touchToggleFrame.HideCursor = true
 
 -- ---------- RADIAL MENU ----------
 local RADIAL_KEYS = { 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x30 }
@@ -1777,7 +1760,7 @@ radialFrame = imgui.OnFrame(
         local io = imgui.GetIO()
         local dt, ds = io.DeltaTime, io.DisplaySize
         radialAnim = approach(radialAnim, radialOpen[0] and 1 or 0, 13, dt)
-        radialFrame.LockPlayer = radialOpen[0]
+        radialFrame.LockPlayer = false
         local ease = smooth(radialAnim)
         curAlpha = ease
 
@@ -2258,7 +2241,7 @@ local function isOtherUiOpen()
     return phoneUI.isOpen() or inventoryUI.isOpen() or vehiclesUI.isOpen()
         or vipRubyUI.isOpen() or cctvUI.isOpen() or adminPanelUI.isOpen()
         or factionVehicleUI.isOpen() or factionPanelUI.isOpen() or mechanicServiceUI.isOpen()
-        or businessUI.isOpen()
+        or businessUI.isOpen() or loginUI.personalDataUI.isOpen()
 end
 
 local function toggleFactionVehicleUi()
@@ -2295,6 +2278,40 @@ local function toggleRadial()
     end
     radialOpen[0] = true
 end
+
+local touchAccessFrame = imgui.OnFrame(
+    function()
+        return isSampAvailable() and isPlayerUiReady() and not menuOpen[0]
+            and not radialOpen[0] and not adminOpen[0] and menuAnim <= 0.01
+            and not isOtherUiOpen()
+    end,
+    function()
+        local display = imgui.GetIO().DisplaySize
+        local windowWidth = math.min(330, display.x - 16)
+        local buttonWidth = (windowWidth - 28) / 3
+        local windowHeight = 52
+        imgui.SetNextWindowPos(V2(math.max(8, display.x - windowWidth - 8),
+            math.max(8, display.y * 0.16)), imgui.Cond.Always)
+        imgui.SetNextWindowSize(V2(windowWidth, windowHeight), imgui.Cond.Always)
+        imgui.SetNextWindowBgAlpha(0.82)
+        local flags = imgui.WindowFlags.NoDecoration + imgui.WindowFlags.NoMove
+            + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoSavedSettings
+        imgui.Begin("##pbrp_android_touch_access", nil, flags)
+        if imgui.Button("RP/PKU", V2(buttonWidth, 38)) then
+            toggleMenu()
+        end
+        imgui.SameLine()
+        if imgui.Button("RADIAL", V2(buttonWidth, 38)) then
+            toggleRadial()
+        end
+        imgui.SameLine()
+        if imgui.Button("ADMIN UI", V2(buttonWidth, 38)) then
+            toggleAdminUi()
+        end
+        imgui.End()
+    end
+)
+touchAccessFrame.HideCursor = true
 
 local updaterDownloadSound
 local updaterDownloadSoundWarned = false

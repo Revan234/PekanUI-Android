@@ -16,12 +16,18 @@ WebView2 executable.
    provides the native renderer; never install the PC `cimguidx9.dll` on
    Android.
 5. Connect to PekanBaru, then open the UI using `/rpui` or the on-screen
-   **PBRP UI** button. `/lradial` opens the touch-operated radial menu.
+   **RP/PKU** button (F2 remains the keyboard shortcut). The on-screen
+   **RADIAL** button or `/lradial` opens the radial menu. **ADMIN UI** opens
+   the admin panel when the server has confirmed the account's admin access.
+   The Android roleplay panels do not lock player controls, so the game
+   movement analog and sprint controls remain available while they are open.
 
 The Android layout switches to a page selector in portrait mode and retains
 the sidebar in landscape. The port contains the roleplay hub, HUD, radial menu,
 inventory, phone, vehicles, login/character selection, faction and business
-panels, notifications, and the other Lua UI modules in `uijtrp`. Features
+panels, notifications, profile-data creation, and the other Lua UI modules in
+`uijtrp`. The login screen also supports account verification and registration
+dialogs when those are sent by the server. Features
 that require server commands, permissions, streamed textdraws, or a specific
 location still depend on the gamemode and server.
 
