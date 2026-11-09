@@ -1,0 +1,17 @@
+The Browser's ad, tracker and malware blocking lists
+=====================================================
+
+filters\easylist.txt     EasyList - https://easylist.to/
+filters\easyprivacy.txt  EasyPrivacy - https://easylist.to/
+  The EasyList authors (https://easylist.to/). Dual licensed under the GNU General Public License version 3 (or any
+  later version) and Creative Commons Attribution-ShareAlike 3.0 Unported (or any later version):
+  https://easylist.to/pages/licence.html - https://www.gnu.org/licenses/gpl-3.0.txt -
+  https://creativecommons.org/licenses/by-sa/3.0/
+  The files are unmodified copies of the lists as published.
+
+filters\urlhaus-filter-online.txt   Online Malicious URL Blocklist - https://gitlab.com/malware-filter/urlhaus-filter
+  CC0 1.0 Universal and MIT License (https://gitlab.com/malware-filter/urlhaus-filter#license); its data comes from
+  URLhaus (https://urlhaus.abuse.ch/, CC0). Not endorsed by abuse.ch.
+
+The game refreshes these lists once a week, downloading them from the addresses above with your own connection
+(never through San Andreas Online's servers).

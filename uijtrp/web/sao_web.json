@@ -1,0 +1,49 @@
+{
+ "product": "SanAndreasOnline-Browser",
+ "version": 4,
+ "engine": "Microsoft WebView2 (Evergreen, Windows)",
+ "sdk": "1.0.4258.31",
+ "helperLevel": 5,
+ "files": [
+  {
+   "path": "LICENSES_filters.txt",
+   "size": 1116,
+   "sha256": "177160084b04532404251a450b8aa2ce3b8b83ec2a6d0bcbba193c0f12d95f7b"
+  },
+  {
+   "path": "LICENSE_WebView2_SDK.txt",
+   "size": 1487,
+   "sha256": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55"
+  },
+  {
+   "path": "NOTICE_WebView2_SDK.txt",
+   "size": 3894,
+   "sha256": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90"
+  },
+  {
+   "path": "README.txt",
+   "size": 1298,
+   "sha256": "b0ecfc8f9508bd22e64f7833db9eb1cfa80ad3500f4a0e637d8cda1d3301a379"
+  },
+  {
+   "path": "filters/easylist.txt",
+   "size": 2182492,
+   "sha256": "56e9d1077e734d41571d7825ba7e0649e9f2b34965662ec902bb7f943626ce0d"
+  },
+  {
+   "path": "filters/easyprivacy.txt",
+   "size": 1509900,
+   "sha256": "a110455f17243dff95d93369984b015f8017a4c1111dbe2e218f7a629d1f79b7"
+  },
+  {
+   "path": "filters/urlhaus-filter-online.txt",
+   "size": 2498477,
+   "sha256": "c6d32616d1abcb621a0d77b4f063ceafeadf14d4f3f759d0e67fa9293fa52140"
+  },
+  {
+   "path": "sao_web.exe",
+   "size": 825344,
+   "sha256": "fcfbb9993ad54618f4ed3cd636acb28b7d9f059968e4ecde6456e9fda69a68bb"
+  }
+ ]
+}

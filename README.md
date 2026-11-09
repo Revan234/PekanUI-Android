@@ -1,31 +1,44 @@
 # PekanBaru Android UI
 
-This folder contains a separate Android entry script and the MonetLoader
-Android `mimgui` Lua library. The library files are from
-[MonetLoaderOSS](https://github.com/xefinity/MonetLoaderOSS), distributed under
-the MIT License. MonetLoader supplies the native renderer; this folder does
-not include or build a native Android binary.
+This is the Android/MonetLoader build of the PekanBaru roleplay UI. It is
+separate from the Windows PC script and uses MonetLoader's Android-native
+`mimgui` renderer; it does not load `cimguidx9.dll`, Windows APIs, or the
+WebView2 executable.
 
-Install `android/uijtrp.lua` as a separate script (for example
-`uijtrp_android.lua`); do not replace the PC `uijtrp.lua`. Copy the files in
-`android/lib/mimgui` to the device's `monetloader/lib/mimgui` folder, replacing
-the PC versions of `init.lua`, `imgui.lua`, and `cdefs.lua`. Keep
-`trebucbd.ttf` in that folder. Do not use the PC `cimguidx9.dll`: the Android
-library loads MonetLoader's native renderer instead.
+## Install
 
-Requires MonetLoader 2.6.0 or newer. Type `/rpui` in game to open the
-touch-friendly quick-command menu.
+1. Use MonetLoader 2.6.0 or newer.
+2. Install `uijtrp.lua` in the MonetLoader scripts folder.
+3. Copy the `uijtrp`, `assets`, and `jtrp_phone` folders beside `uijtrp.lua`.
+   Keep the folder names unchanged; the script loads its modules and images
+   from these paths.
+4. Copy the files in `lib/mimgui` to `monetloader/lib/mimgui`. MonetLoader
+   provides the native renderer; never install the PC `cimguidx9.dll` on
+   Android.
+5. Connect to PekanBaru, then open the UI using `/rpui` or the on-screen
+   **PBRP UI** button. `/lradial` opens the touch-operated radial menu.
 
-This Android entry currently provides a mobile quick-command menu. It is
-separate from the full PC UI and does not yet port the PC-only browser,
-Windows integrations, or every specialized UI module.
+The Android layout switches to a page selector in portrait mode and retains
+the sidebar in landscape. The port contains the roleplay hub, HUD, radial menu,
+inventory, phone, vehicles, login/character selection, faction and business
+panels, notifications, and the other Lua UI modules in `uijtrp`. Features
+that require server commands, permissions, streamed textdraws, or a specific
+location still depend on the gamemode and server.
+
+Windows-only browser launching is unavailable on Android. Discord and website
+buttons copy their URL so it can be pasted into the Android browser. The phone
+media album can read screenshots from Android's `Pictures/Screenshots` or
+`DCIM/Screenshots` folders when MonetLoader has storage access.
 
 ## Automatic updates
 
-The script checks
-`Revan234/PekanUI-Android/main/uijtrp.lua` when it starts and every 10 minutes.
-Publish the Android script at the repository root with the exact filename
-`uijtrp.lua`. The updater validates the downloaded Lua source, installs it next
-to the running script, and asks MonetLoader to reload scripts. It updates only
-the Android script; MonetLoader's native renderer and `mimgui` dependencies are
-not downloaded or replaced by this updater.
+The updater checks `Revan234/PekanUI-Android` on branch `main` while connected
+to the configured PekanBaru server, then checks again every 10 minutes. Keep
+`update-manifest.txt` at the repository root. It lists the main script,
+compatible Lua modules, and UI assets updated by the updater. Changes to
+`uijtrp.lua`, `uijtrp`, and `assets` should be added to that manifest.
+
+The updater does not replace MonetLoader's native renderer or update the
+large notification/ringtone files in `jtrp_phone`; those files must be
+included when installing the repository. Never add Windows-only browser
+executables or DLLs to the Android manifest.
