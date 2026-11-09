@@ -1,4 +1,5 @@
-return function(imgui, V2, color, sendChat, inventoryUI, isPlayerUiReady)
+return function(imgui, V2, color, sendChat, inventoryUI, isPlayerUiReady,
+    isChatInputActive, isDialogActive)
     local state = {
         target = nil,
         menuTarget = nil,
@@ -122,7 +123,7 @@ return function(imgui, V2, color, sendChat, inventoryUI, isPlayerUiReady)
         end
 
         if frame then frame.HideCursor = true end
-        if state.target and not sampIsChatInputActive() and not sampIsDialogActive() then
+        if state.target and not isChatInputActive() and not isDialogActive() then
             if wasKeyPressed(0x12) then
                 state.menuTarget = state.target
                 state.menuOpen = true

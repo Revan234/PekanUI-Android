@@ -25,6 +25,11 @@ panels, notifications, and the other Lua UI modules in `uijtrp`. Features
 that require server commands, permissions, streamed textdraws, or a specific
 location still depend on the gamemode and server.
 
+Some MonetLoader Android builds do not include the `samp.events` Lua module.
+The main UI remains available without it, but event-driven textdraw features
+such as custom server notifications and textdraw inventory interception need a
+compatible `samp.events` module installed in MonetLoader's `lib` folder.
+
 Windows-only browser launching is unavailable on Android. Discord and website
 buttons copy their URL so it can be pasted into the Android browser. The phone
 media album can read screenshots from Android's `Pictures/Screenshots` or
@@ -37,6 +42,9 @@ to the configured PekanBaru server, then checks again every 10 minutes. Keep
 `update-manifest.txt` at the repository root. It lists the main script,
 compatible Lua modules, and UI assets updated by the updater. Changes to
 `uijtrp.lua`, `uijtrp`, and `assets` should be added to that manifest.
+Downloads use MonetLoader's native downloader when available, then fall back
+to its `requests` or LuaSocket/LuaSec HTTP modules. The corresponding MonetLoader
+libraries must be installed for automatic updates to work.
 
 The updater does not replace MonetLoader's native renderer or update the
 large notification/ringtone files in `jtrp_phone`; those files must be

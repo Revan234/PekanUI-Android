@@ -236,7 +236,7 @@ do
     if okEvents and type(events) == "table" then
         sampev = events
     else
-        reportLoadError("lib.samp.events", events)
+        print("[PBRP/PKU UI] Modul samp.events tidak tersedia; fitur textdraw dan event server tertentu dinonaktifkan.")
         sampev = {}
     end
 end
@@ -265,6 +265,21 @@ local function isPlayerUiReady()
     if playerSpawned then return true end
     local ok, spawned = pcall(sampIsLocalPlayerSpawned)
     return (ok and spawned) and true or false
+end
+
+local function isSampInputActive(apiName)
+    local api = rawget(_G, apiName)
+    if type(api) ~= "function" then return true end
+    local ok, active = pcall(api)
+    return not ok or active == true
+end
+
+local function isChatInputActive()
+    return isSampInputActive("sampIsChatInputActive")
+end
+
+local function isDialogActive()
+    return isSampInputActive("sampIsDialogActive")
 end
 
 -- catat error UI sekali saja di log, dan tampilkan di menu agar mudah dilacak
@@ -455,7 +470,8 @@ local inventoryUI = loadFactory("uijtrp.inventory_ui", stubModule(),
     sendCommand, uiSounds, isPlayerUiReady)
 local interactionUI = loadFactory("uijtrp.interaction_ui", stubModule({
     update = noop, isOpen = function() return false end,
-}), imgui, V2, col, sendCommand, inventoryUI, isPlayerUiReady)
+}), imgui, V2, col, sendCommand, inventoryUI, isPlayerUiReady,
+    isChatInputActive, isDialogActive)
 local vehiclesUI = loadFactory("uijtrp.vehicles_ui", stubModule(),
     imgui, V2, sendCommand, uiSounds, isPlayerUiReady, getAccent)
 local vipRubyUI = loadFactory("uijtrp.vipruby_ui", stubModule(),
@@ -1366,6 +1382,7 @@ end)
 -- ---------- MENU UTAMA ----------
 local SIDE_W, WIN_W, WIN_H = 236, 1080, 760
 local menuFrame
+local toggleMenu
 menuFrame = imgui.OnFrame(
     function() return menuOpen[0] or menuAnim > 0.01 end,
     function()
@@ -2255,7 +2272,7 @@ local function toggleFactionVehicleUi()
     factionVehicleUI.toggle()
 end
 
-local function toggleMenu()
+toggleMenu = function()
     if menuOpen[0] then
         menuOpen[0] = false
         return
@@ -2369,6 +2386,9 @@ local function readUpdaterFile(path)
 end
 
 local function fetchUpdaterResponse(url)
+    local errors = {}
+    local lastBody, lastStatus
+
     local function unpackResponse(response)
         if type(response) == "string" then return response, 200 end
         if type(response) ~= "table" then return nil, nil end
@@ -2378,12 +2398,88 @@ local function fetchUpdaterResponse(url)
         return nil, status
     end
 
+    local function fetchWithSocket(moduleName)
+        local okClient, client = pcall(require, moduleName)
+        if not okClient or type(client) ~= "table" or type(client.request) ~= "function" then
+            errors[#errors + 1] = moduleName .. " tidak tersedia"
+            return nil
+        end
+
+        local okLtn12, ltn12 = pcall(require, "ltn12")
+        if not okLtn12 or type(ltn12) ~= "table" or type(ltn12.sink) ~= "table"
+            or type(ltn12.sink.table) ~= "function" then
+            errors[#errors + 1] = "ltn12 tidak tersedia untuk " .. moduleName
+            return nil
+        end
+
+        local function resolveRedirect(baseUrl, location)
+            if location:match("^https?://") then return location end
+            local scheme = baseUrl:match("^(https?):")
+            if location:sub(1, 2) == "//" then return scheme .. ":" .. location end
+            local origin = baseUrl:match("^(https?://[^/]+)")
+            if location:sub(1, 1) == "/" then return origin .. location end
+            local directory = baseUrl:match("^(.*)/[^/]*$") or baseUrl
+            return directory .. "/" .. location
+        end
+
+        local currentUrl = url
+        for redirectCount = 0, 4 do
+            local chunks = {}
+            local okRequest, result, status, headers, statusLine = pcall(client.request, {
+                url = currentUrl,
+                sink = ltn12.sink.table(chunks),
+                headers = {
+                    ["user-agent"] = "PekanBaru-Android-Updater",
+                    ["accept"] = "*/*",
+                },
+            })
+            if not okRequest then
+                errors[#errors + 1] = moduleName .. ": " .. tostring(result)
+                return nil
+            end
+
+            local statusCode = tonumber(status)
+            if result == 1 and statusCode then
+                if statusCode == 301 or statusCode == 302 or statusCode == 303
+                    or statusCode == 307 or statusCode == 308 then
+                    local location
+                    for headerName, headerValue in pairs(headers or {}) do
+                        if tostring(headerName):lower() == "location" then
+                            location = headerValue
+                            break
+                        end
+                    end
+                    if location and redirectCount < 4 then
+                        currentUrl = resolveRedirect(currentUrl, tostring(location))
+                    else
+                        errors[#errors + 1] = moduleName .. ": redirect tidak valid atau terlalu banyak"
+                        return nil
+                    end
+                else
+                    return table.concat(chunks), statusCode
+                end
+            else
+                errors[#errors + 1] = moduleName .. ": " .. tostring(statusLine or status or result)
+                return nil
+            end
+        end
+        return nil
+    end
+
     local okRequests, requests = pcall(require, "requests")
     if okRequests and type(requests) == "table" and type(requests.get) == "function" then
         local ok, response = pcall(requests.get, url, { timeout = 15 })
         if ok then
             local body, status = unpackResponse(response)
-            if body then return body, status end
+            if body and status == 200 then return body, status end
+            if body then
+                lastBody, lastStatus = body, status
+                errors[#errors + 1] = "requests.get HTTP " .. tostring(status)
+            else
+                errors[#errors + 1] = "requests.get tidak mengembalikan body"
+            end
+        else
+            errors[#errors + 1] = "requests.get: " .. tostring(response)
         end
     end
 
@@ -2392,7 +2488,15 @@ local function fetchUpdaterResponse(url)
         local ok, response = pcall(httpLibrary.get, url, { timeout = 15 })
         if ok then
             local body, status = unpackResponse(response)
-            if body then return body, status end
+            if body and status == 200 then return body, status end
+            if body then
+                lastBody, lastStatus = body, status
+                errors[#errors + 1] = "http.get HTTP " .. tostring(status)
+            else
+                errors[#errors + 1] = "http.get tidak mengembalikan body"
+            end
+        else
+            errors[#errors + 1] = "http.get: " .. tostring(response)
         end
     end
 
@@ -2401,10 +2505,35 @@ local function fetchUpdaterResponse(url)
         local ok, response = pcall(httpGet, url)
         if ok then
             local body, status = unpackResponse(response)
-            if body then return body, status end
+            if body and status == 200 then return body, status end
+            if body then
+                lastBody, lastStatus = body, status
+                errors[#errors + 1] = "httpGet HTTP " .. tostring(status)
+            else
+                errors[#errors + 1] = "httpGet tidak mengembalikan body"
+            end
+        else
+            errors[#errors + 1] = "httpGet: " .. tostring(response)
         end
     end
-    return nil, nil, "API HTTP requests/httpGet MonetLoader tidak tersedia"
+
+    local body, status = fetchWithSocket("ssl.https")
+    if body and status == 200 then return body, status end
+    if body then
+        lastBody, lastStatus = body, status
+        errors[#errors + 1] = "ssl.https HTTP " .. tostring(status)
+    end
+
+    body, status = fetchWithSocket("socket.http")
+    if body and status == 200 then return body, status end
+    if body then
+        lastBody, lastStatus = body, status
+        errors[#errors + 1] = "socket.http HTTP " .. tostring(status)
+    end
+
+    if lastBody then return lastBody, lastStatus end
+
+    return nil, nil, "semua API HTTP gagal: " .. table.concat(errors, "; ")
 end
 
 local function saveUpdaterContent(path, content)
@@ -3023,7 +3152,7 @@ function main()
         local spawned = isSampAvailable() and sampIsLocalPlayerSpawned() and true or false
         playerSpawned = spawned
         if phoneUI.updateSharedMusic then phoneUI.updateSharedMusic() end
-        local typing = isSampAvailable() and (sampIsChatInputActive() or sampIsDialogActive())
+        local typing = isSampAvailable() and (isChatInputActive() or isDialogActive())
         interactionUI.update(spawned and not typing and not menuOpen[0] and not radialOpen[0]
             and not adminOpen[0] and not isOtherUiOpen())
         if not spawned then

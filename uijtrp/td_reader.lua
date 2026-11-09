@@ -14,13 +14,23 @@
 --    TD.unhide(id)     kembalikan ke posisi asli
 --    TD.dump()         tulis semua textdraw ke uiPBRP_textdraws.txt
 -- ============================================================
-local sampev = require "lib.samp.events"
+local sampev
+do
+    local okEvents, events = pcall(require, "lib.samp.events")
+    if not okEvents then
+        okEvents, events = pcall(require, "samp.events")
+    end
+    if okEvents and type(events) == "table" then
+        sampev = events
+    end
+end
 
 local TD = {
     items = {},
     version = 0,
     OFFSCREEN = -4000,
     INVALID = 65535,
+    eventsAvailable = sampev ~= nil,
 }
 
 local listeners = { show = {}, hide = {}, text = {} }
@@ -173,6 +183,7 @@ end
 
 -- ---------- hook event samp.lua (berantai dengan handler lain) ----------
 local function hook(name, fn)
+    if not sampev then return end
     local previous = sampev[name]
     sampev[name] = function(...)
         local ok, result = pcall(fn, ...)
