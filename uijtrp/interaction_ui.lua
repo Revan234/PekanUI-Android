@@ -1,5 +1,5 @@
 return function(imgui, V2, color, sendChat, inventoryUI, isPlayerUiReady,
-    isChatInputActive, isDialogActive)
+    isChatInputActive, isDialogActive, keyWasPressed)
     local state = {
         target = nil,
         menuTarget = nil,
@@ -115,7 +115,7 @@ return function(imgui, V2, color, sendChat, inventoryUI, isPlayerUiReady,
         end
 
         if state.menuOpen then
-            if wasKeyPressed(0x1B) then
+            if keyWasPressed(0x1B) then
                 state.menuOpen = false
                 state.menuTarget = nil
             end
@@ -124,7 +124,7 @@ return function(imgui, V2, color, sendChat, inventoryUI, isPlayerUiReady,
 
         if frame then frame.HideCursor = true end
         if state.target and not isChatInputActive() and not isDialogActive() then
-            if wasKeyPressed(0x12) then
+            if keyWasPressed(0x12) then
                 state.menuTarget = state.target
                 state.menuOpen = true
                 state.payAmount[0] = 100

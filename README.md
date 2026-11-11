@@ -16,8 +16,9 @@ WebView2 executable.
    provides the native renderer; never install the PC `cimguidx9.dll` on
    Android.
 5. Connect to PekanBaru, then open the UI using `/rpui` or the on-screen
-   **RP/PKU** button (F2 remains the keyboard shortcut). The on-screen
-   **RADIAL** button, `/lradial`, or `/radial` opens the radial menu. The
+   **MENU RP** button. Open the radial menu using `/lradial`, `/radial`, or
+   the on-screen **RADIAL** button. M and F2 remain optional keyboard
+   shortcuts on MonetLoader builds that expose keyboard input. The
    admin panel is available as an item in the radial menu after the server
    confirms the account's admin access. The access buttons are shown at the
    upper left.

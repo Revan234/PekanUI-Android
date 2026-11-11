@@ -292,6 +292,31 @@ local function isDialogActive()
     return isSampInputActive("sampIsDialogActive")
 end
 
+local keyApiWarningShown = false
+local function keyWasPressed(key)
+    local keyApi = rawget(_G, "wasKeyPressed")
+    if type(keyApi) ~= "function" then
+        keyApi = rawget(_G, "isKeyJustPressed")
+    end
+    if type(keyApi) ~= "function" then
+        if not keyApiWarningShown then
+            keyApiWarningShown = true
+            print("[PBRP/PKU UI] API keyboard tidak tersedia; gunakan tombol layar atau perintah chat.")
+        end
+        return false
+    end
+
+    local ok, pressed = pcall(keyApi, key)
+    if not ok then
+        if not keyApiWarningShown then
+            keyApiWarningShown = true
+            print("[PBRP/PKU UI] Gagal membaca input keyboard: " .. tostring(pressed))
+        end
+        return false
+    end
+    return pressed == true
+end
+
 -- catat error UI sekali saja di log, dan tampilkan di menu agar mudah dilacak
 local lastLoggedError = nil
 local function logUiError(tag, err)
@@ -495,7 +520,7 @@ local inventoryUI = loadFactory("uijtrp.inventory_ui", stubModule(),
 local interactionUI = loadFactory("uijtrp.interaction_ui", stubModule({
     update = noop, isOpen = function() return false end,
 }), imgui, V2, col, sendCommand, inventoryUI, isPlayerUiReady,
-    isChatInputActive, isDialogActive)
+    isChatInputActive, isDialogActive, keyWasPressed)
 local vehiclesUI = loadFactory("uijtrp.vehicles_ui", stubModule(),
     imgui, V2, sendCommand, uiSounds, isPlayerUiReady, getAccent)
 local vipRubyUI = loadFactory("uijtrp.vipruby_ui", stubModule(),
@@ -1816,14 +1841,14 @@ local function chip(dl, x, y, text, r, g, b, rightAlign)
     local ts = imgui.CalcTextSize(text)
     local w, h = ts.x + 16, ts.y + 6
     if rightAlign then x = x - w end
-    dl:AddRectFilled(V2(x, y), V2(x + w, y + h), col(r, g, b, 0.16), h / 2)
-    dl:AddRect(V2(x, y), V2(x + w, y + h), col(r, g, b, 0.55), h / 2, 0, 1)
-    dl:AddText(V2(x + 8, y + 3), col(r, g, b, 1), text)
+    dl:AddRectFilled(V2(x, y), V2(x + w, y + h), col(r, g, b, 0.24), h / 2)
+    dl:AddRect(V2(x, y), V2(x + w, y + h), col(r, g, b, 0.80), h / 2, 0, 1)
+    dl:AddText(V2(x + 8, y + 3), col(1, 1, 1, 1), text)
     return w, h
 end
 
 local function hudPanel(dl, x, y, w, h, borderA, br, bg2, bb)
-    dl:AddRectFilled(V2(x, y), V2(x + w, y + h), col(0.040, 0.036, 0.070, 0.88), 13)
+    dl:AddRectFilled(V2(x, y), V2(x + w, y + h), col(0.025, 0.025, 0.045, 0.96), 13)
     dl:AddRectFilledMultiColor(V2(x + 6, y + 1), V2(x + w - 6, y + 24),
         colA(0.14), colA(0.14), colA(0.0), colA(0.0))
     local border = br and col(br, bg2, bb, borderA) or colA(borderA)
@@ -2016,7 +2041,7 @@ end
 local function drawStatBar(dl, x, y, w, label, icon, value, ghost, r, g, b, flashing)
     icons.draw(dl, icon, x, y, 22, col(r, g, b, 1), col(0.07, 0.08, 0.11, 1))
     local bx0, bx1 = x + 32, x + w
-    dl:AddText(V2(bx0, y), col(0.74, 0.74, 0.88, 1), label)
+    dl:AddText(V2(bx0, y), col(0.88, 0.89, 0.96, 1), label)
     local txt = string.format("%d%%", math.floor(value + 0.5))
     local ts = imgui.CalcTextSize(txt)
     dl:AddText(V2(bx1 - ts.x, y), col(1, 1, 1, 1), txt)
@@ -2038,7 +2063,7 @@ end
 
 local function drawMiniBar(dl, x, y, w, label, icon, value, r, g, b)
     icons.draw(dl, icon, x, y, 18, col(r, g, b, 1), col(0.07, 0.08, 0.11, 1))
-    dl:AddText(V2(x + 24, y), col(0.74, 0.74, 0.88, 1), label)
+    dl:AddText(V2(x + 24, y), col(0.88, 0.89, 0.96, 1), label)
     local txt = string.format("%d%%", math.floor(value + 0.5))
     local ts = imgui.CalcTextSize(txt)
     dl:AddText(V2(x + w - ts.x, y), col(1, 1, 1, 1), txt)
@@ -2059,7 +2084,7 @@ local function drawVignette(ds, strength)
     bg:AddRectFilledMultiColor(V2(ds.x - t, 0), V2(ds.x, ds.y), c0, c1, c1, c0)
 end
 
-local function drawStatsHud(dl, p, h, needs, footer, dt, ds)
+local function drawStatsHud(dl, p, width, h, needs, footer, dt, ds)
     updateHudMetrics(dt)
     local low = hudState.hp <= 25
     local pulse = math.sin(os.clock() * 7) * 0.5 + 0.5
@@ -2067,18 +2092,19 @@ local function drawStatsHud(dl, p, h, needs, footer, dt, ds)
 
     local x, y = p.x, p.y
     if low then
-        hudPanel(dl, x, y, STATS_W, h, 0.45 + 0.4 * pulse, 0.95, 0.28, 0.30)
+        hudPanel(dl, x, y, width, h, 0.45 + 0.4 * pulse, 0.95, 0.28, 0.30)
     else
-        hudPanel(dl, x, y, STATS_W, h, 0.40)
+        hudPanel(dl, x, y, width, h, 0.65)
     end
 
     -- header: nama + ID
     dl:AddRectFilled(V2(x + 14, y + 14), V2(x + 17, y + 32), colA(1), 2)
     local idText = hudNet.id >= 0 and ("ID " .. hudNet.id) or "ID -"
-    local cw = chip(dl, x + STATS_W - 14, y + 13, idText, CONFIG.accent[1], CONFIG.accent[2], CONFIG.accent[3], true)
-    dl:AddText(V2(x + 25, y + 15), col(0.96, 0.96, 1, 1), fitText(hudNet.name or getPlayerName(), STATS_W - 25 - 14 - cw - 8))
+    local cw = chip(dl, x + width - 14, y + 13, idText, CONFIG.accent[1], CONFIG.accent[2], CONFIG.accent[3], true)
+    dl:AddText(V2(x + 25, y + 15), col(0.98, 0.98, 1, 1),
+        fitText(hudNet.name or getPlayerName(), width - 25 - 14 - cw - 8))
 
-    local bw = STATS_W - 28
+    local bw = width - 28
     local cy = y + 40
     local hr, hg, hb = 0.98, 0.36, 0.52
     if low then hr, hg, hb = 0.95, 0.22, 0.26 end
@@ -2099,7 +2125,7 @@ local function drawStatsHud(dl, p, h, needs, footer, dt, ds)
             chip(dl, x + 14, cy + 3, "Rp " .. fmtNum(hudNet.money), 0.40, 0.90, 0.62, false)
         end
         if hudState.ammo ~= nil and hudState.ammo > 1 then
-            chip(dl, x + STATS_W - 14, cy + 3, "AMMO " .. hudState.ammo, 1.0, 0.78, 0.30, true)
+            chip(dl, x + width - 14, cy + 3, "AMMO " .. hudState.ammo, 1.0, 0.78, 0.30, true)
         end
     end
 end
@@ -2112,18 +2138,20 @@ hudFrame = imgui.OnFrame(
         local io = imgui.GetIO()
         local dt, ds = io.DeltaTime, io.DisplaySize
         local h, needs, footer = statsLayout()
+        local width = math.max(1, math.min(STATS_W, ds.x - 24))
         local flags = imgui.WindowFlags.NoDecoration + imgui.WindowFlags.NoMove + imgui.WindowFlags.NoResize
             + imgui.WindowFlags.NoSavedSettings + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoBackground
         if not CONFIG.hud.editMode then flags = flags + imgui.WindowFlags.NoInputs end
 
         local defaultY = math.max(80, ds.y * CONFIG.hud.statsBottomFrac - h)
-        local x, y = CONFIG.hud.position(CONFIG.hud.statsX, CONFIG.hud.statsY, 16, defaultY, STATS_W, h, ds)
-        x, y = CONFIG.hud.updateDrag("stats", x, y, STATS_W, h, ds)
+        local x, y = CONFIG.hud.position(CONFIG.hud.statsX, CONFIG.hud.statsY,
+            math.min(16, math.max(0, ds.x - width)), defaultY, width, h, ds)
+        x, y = CONFIG.hud.updateDrag("stats", x, y, width, h, ds)
         imgui.SetNextWindowPos(V2(x, y), imgui.Cond.Always)
-        imgui.SetNextWindowSize(V2(STATS_W, h), imgui.Cond.Always)
+        imgui.SetNextWindowSize(V2(width, h), imgui.Cond.Always)
         imgui.Begin("##PBRP_status_hud", nil, flags)
         local dl, p = imgui.GetWindowDrawList(), imgui.GetWindowPos()
-        local ok, err = xpcall(function() drawStatsHud(dl, p, h, needs, footer, dt, ds) end, debug.traceback)
+        local ok, err = xpcall(function() drawStatsHud(dl, p, width, h, needs, footer, dt, ds) end, debug.traceback)
         imgui.End()
         if not ok then logUiError("hud", err) end
     end
@@ -2321,9 +2349,9 @@ local touchAccessFrame = imgui.OnFrame(
     end,
     function()
         local display = imgui.GetIO().DisplaySize
-        local windowWidth = math.min(190, math.max(0, display.x - 16))
-        local buttonWidth = math.max(0, (windowWidth - 12) / 2)
-        local windowHeight = 48
+        local windowWidth = math.min(240, math.max(0, display.x - 16))
+        local buttonWidth = math.max(0, (windowWidth - 16) / 2)
+        local windowHeight = 60
         local x = math.min(math.max(8, display.x * 0.16), math.max(8, display.x - windowWidth - 8))
         imgui.SetNextWindowPos(V2(x, 10), imgui.Cond.Always)
         imgui.SetNextWindowSize(V2(windowWidth, windowHeight), imgui.Cond.Always)
@@ -2331,11 +2359,11 @@ local touchAccessFrame = imgui.OnFrame(
         local flags = imgui.WindowFlags.NoDecoration + imgui.WindowFlags.NoMove
             + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoSavedSettings
         imgui.Begin("##pbrp_android_touch_access", nil, flags)
-        if imgui.Button("RP/PKU", V2(buttonWidth, 36)) then
+        if imgui.Button("MENU RP", V2(buttonWidth, 40)) then
             toggleMenu()
         end
         imgui.SameLine()
-        if imgui.Button("RADIAL", V2(buttonWidth, 36)) then
+        if imgui.Button("RADIAL", V2(buttonWidth, 40)) then
             toggleRadial()
         end
         imgui.End()
@@ -3182,30 +3210,30 @@ function main()
         wasPlayerSpawned = spawned
         if not (isSampAvailable() and isPlayerUiReady()) then return end
 
-        if wasKeyPressed(0x4D) and not typing then
+        if keyWasPressed(0x4D) and not typing then
             toggleRadial()
         end
-        if wasKeyPressed(0x71) and not typing then
+        if keyWasPressed(0x71) and not typing then
             toggleMenu()
         end
         -- pintasan angka 1..9, 0 saat radial terbuka
         if radialOpen[0] and not typing then
             local entries = getRadialEntries()
             for idx, vk in ipairs(RADIAL_KEYS) do
-                if entries[idx] and wasKeyPressed(vk) then
+                if entries[idx] and keyWasPressed(vk) then
                     uiSounds.play("click")
                     radialAction(entries[idx])
                     break
                 end
             end
         end
-        if wasKeyPressed(0x1B) and factionPanelUI.isOpen() then
+        if keyWasPressed(0x1B) and factionPanelUI.isOpen() then
             factionPanelUI.close()
-        elseif wasKeyPressed(0x1B) and mechanicServiceUI.isOpen() then
+        elseif keyWasPressed(0x1B) and mechanicServiceUI.isOpen() then
             mechanicServiceUI.close()
-        elseif wasKeyPressed(0x1B) and businessUI.isOpen() then
+        elseif keyWasPressed(0x1B) and businessUI.isOpen() then
             businessUI.close()
-        elseif wasKeyPressed(0x1B) and not typing then
+        elseif keyWasPressed(0x1B) and not typing then
             if phoneUI.isOpen() then
                 phoneUI.close()
             elseif inventoryUI.isOpen() then
