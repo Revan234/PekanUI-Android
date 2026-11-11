@@ -20,6 +20,7 @@ uijtrp/phone_ui.lua
 uijtrp/personal_data_ui.lua
 uijtrp/speedometer.lua
 uijtrp/td_reader.lua
+uijtrp/updater_manifest.lua
 uijtrp/ui_sounds.lua
 uijtrp/ui_theme.lua
 uijtrp/vehicles_ui.lua

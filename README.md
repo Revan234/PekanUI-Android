@@ -17,8 +17,10 @@ WebView2 executable.
    Android.
 5. Connect to PekanBaru, then open the UI using `/rpui` or the on-screen
    **RP/PKU** button (F2 remains the keyboard shortcut). The on-screen
-   **RADIAL** button or `/lradial` opens the radial menu. **ADMIN UI** opens
-   the admin panel when the server has confirmed the account's admin access.
+   **RADIAL** button, `/lradial`, or `/radial` opens the radial menu. The
+   admin panel is available as an item in the radial menu after the server
+   confirms the account's admin access. The access buttons are shown at the
+   upper left.
    The Android roleplay panels do not lock player controls, so the game
    movement analog and sprint controls remain available while they are open.
 
@@ -46,8 +48,10 @@ media album can read screenshots from Android's `Pictures/Screenshots` or
 The updater checks `Revan234/PekanUI-Android` on branch `main` while connected
 to the configured PekanBaru server, then checks again every 10 minutes. Keep
 `update-manifest.txt` at the repository root. It lists the main script,
-compatible Lua modules, and UI assets updated by the updater. Changes to
-`uijtrp.lua`, `uijtrp`, and `assets` should be added to that manifest.
+compatible Lua modules, and UI assets updated by the updater. The updater
+validates manifest paths through `uijtrp/updater_manifest.lua`; add new updater
+modules, files under `uijtrp` or `assets`, and supported `jtrp_phone` assets
+to the manifest when they should be updated.
 Downloads use MonetLoader's native downloader when available, then fall back
 to its `requests` or LuaSocket/LuaSec HTTP modules. The corresponding MonetLoader
 libraries must be installed for automatic updates to work.

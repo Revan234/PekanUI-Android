@@ -227,6 +227,16 @@ do
     end
 end
 
+local updaterManifest = { isAllowedPath = function(_) return false end }
+do
+    local okManifest, manifest = pcall(require, "uijtrp.updater_manifest")
+    if okManifest and type(manifest) == "table" and type(manifest.isAllowedPath) == "function" then
+        updaterManifest = manifest
+    else
+        reportLoadError("uijtrp.updater_manifest", okManifest and "API validasi path tidak tersedia" or manifest)
+    end
+end
+
 local sampev
 do
     local okEvents, events = pcall(require, "lib.samp.events")
@@ -291,6 +301,14 @@ local function logUiError(tag, err)
         lastLoggedError = text
         print("[PBRP/PKU UI] " .. text)
     end
+end
+
+local reportedHudMetricErrors = {}
+local function logHudMetricError(tag, err)
+    local message = tostring(err)
+    if reportedHudMetricErrors[tag] == message then return end
+    reportedHudMetricErrors[tag] = message
+    logUiError("HUD " .. tag, err)
 end
 
 local function newBuf() return imgui.new.char[129]() end
@@ -373,6 +391,7 @@ local function updateHudMetrics(dt)
 
     -- vital karakter
     local okH, hp = pcall(getCharHealth, PLAYER_PED)
+    if not okH then logHudMetricError("health", hp) end
     if okH and hp then
         hp = math.max(0, math.min(100, hp))
         if hp < hudState.lastHealth - 0.5 then hudState.hitFlash = 1 end
@@ -385,6 +404,7 @@ local function updateHudMetrics(dt)
         end
     end
     local okA, ar = pcall(getCharArmour, PLAYER_PED)
+    if not okA then logHudMetricError("armor", ar) end
     if okA and ar then
         ar = math.max(0, math.min(100, ar))
         hudState.ar = ar
@@ -399,8 +419,10 @@ local function updateHudMetrics(dt)
 
     -- senjata aktif
     local okW, weapon = pcall(getCurrentCharWeapon, PLAYER_PED)
+    if not okW then logHudMetricError("weapon", weapon) end
     if okW and weapon and weapon > 0 then
         local okM, ammo = pcall(getAmmoInCharWeapon, PLAYER_PED, weapon)
+        if not okM then logHudMetricError("ammo", ammo) end
         hudState.weapon, hudState.ammo = weapon, (okM and ammo) or nil
     else
         hudState.weapon, hudState.ammo = nil, nil
@@ -409,7 +431,7 @@ local function updateHudMetrics(dt)
     -- data jaringan & uang: cukup 1x per detik
     if now - hudNet.at >= 1.0 then
         hudNet.at = now
-        pcall(function()
+        local okNetwork, networkError = pcall(function()
             local _, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
             if id and id >= 0 then
                 hudNet.id = id
@@ -419,9 +441,11 @@ local function updateHudMetrics(dt)
             end
             hudNet.online = sampGetPlayerCount(false)
         end)
+        if not okNetwork then logHudMetricError("network", networkError) end
         local getMoney = storeScore or getPlayerMoney
         if getMoney then
             local okMoney, value = pcall(getMoney, PLAYER_HANDLE)
+            if not okMoney then logHudMetricError("money", value) end
             hudNet.money = (okMoney and tonumber(value)) or nil
         end
     end
@@ -644,8 +668,8 @@ sampev.onServerMessage = function(messageColor, text)
         end
         local hungerValue, thirstValue = clean:match("^@PBRPUI:HUD:NEEDS:(%d+):(%d+)$")
         if hungerValue then
-            hudState.hunger = math.min(100, tonumber(hungerValue))
-            hudState.thirst = math.min(100, tonumber(thirstValue))
+            hudState.hunger = math.max(0, math.min(100, tonumber(hungerValue)))
+            hudState.thirst = math.max(0, math.min(100, tonumber(thirstValue)))
             hudState.needsAt = os.clock()
             return true
         end
@@ -732,7 +756,11 @@ local function radialAction(item)
     elseif item.action == "admin" then
         radialOpen[0] = false
         menuOpen[0] = false
-        adminPanelUI.open()
+        if canUseAdminUi() then
+            adminPanelUI.open()
+        else
+            sampAddChatMessage("[PBRP/PKU UI] Akses panel admin belum diterima dari server.", 0xFFFF6A6A)
+        end
     elseif item.action == "vipruby" then
         radialOpen[0] = false
         sampSendChat("/vrubyui")
@@ -744,20 +772,6 @@ end
 
 canUseAdminUi = function()
     return adminLevel > 0 and #adminCommands > 0
-end
-
-local function toggleAdminUi()
-    if adminPanelUI.isOpen() then
-        adminPanelUI.close()
-        return
-    end
-    if not canUseAdminUi() or not isSampAvailable() or not isPlayerUiReady()
-        or phoneUI.isOpen() or inventoryUI.isOpen() or vehiclesUI.isOpen() or vipRubyUI.isOpen() then
-        return
-    end
-    menuOpen[0] = false
-    radialOpen[0] = false
-    adminPanelUI.open()
 end
 
 local adminFrame
@@ -1779,9 +1793,14 @@ radialFrame = imgui.OnFrame(
             radialOpen[0] = false
             radialAnim = 0
             logUiError("radial", err)
+            if isSampAvailable() then
+                sampAddChatMessage("[PBRP/PKU UI] Radial gagal digambar: "
+                    .. tostring(err):match("^[^\r\n]+"), 0xFFFF6A6A)
+            end
         end
     end
 )
+radialFrame.HideCursor = false
 
 -- ---------- HUD ----------
 local function textSized(dl, x, y, text, color, size)
@@ -1963,6 +1982,9 @@ local fpsFrame = imgui.OnFrame(
             and math.max(0, ds.x - width - margin) or margin
         local defaultY = (CONFIG.hud.fpsPosition == "bottom-left" or CONFIG.hud.fpsPosition == "bottom-right")
             and math.max(0, ds.y - FPS_H - margin) or margin
+        if CONFIG.hud.fpsPosition == "top-left" and CONFIG.hud.fpsX == nil and CONFIG.hud.fpsY == nil then
+            defaultY = 62
+        end
         local x, y = CONFIG.hud.position(CONFIG.hud.fpsX, CONFIG.hud.fpsY, defaultX, defaultY, width, FPS_H, ds)
         x, y = CONFIG.hud.updateDrag("fps", x, y, width, FPS_H, ds)
         imgui.SetNextWindowPos(V2(x, y), imgui.Cond.Always)
@@ -2260,7 +2282,13 @@ toggleMenu = function()
         menuOpen[0] = false
         return
     end
-    if not isSampAvailable() or not isPlayerUiReady() or isOtherUiOpen() or adminOpen[0] then
+    if not isSampAvailable() then return end
+    if not isPlayerUiReady() then
+        sampAddChatMessage("[PBRP/PKU UI] Menu tersedia setelah karakter masuk ke permainan.", 0xFFFF6A6A)
+        return
+    end
+    if isOtherUiOpen() or adminOpen[0] then
+        sampAddChatMessage("[PBRP/PKU UI] Tutup menu lain sebelum membuka RP/PKU.", 0xFFFF6A6A)
         return
     end
     radialOpen[0] = false
@@ -2273,7 +2301,13 @@ local function toggleRadial()
         radialOpen[0] = false
         return
     end
-    if not isSampAvailable() or not isPlayerUiReady() or menuOpen[0] or adminOpen[0] or isOtherUiOpen() then
+    if not isSampAvailable() then return end
+    if not isPlayerUiReady() then
+        sampAddChatMessage("[PBRP/PKU UI] Radial tersedia setelah karakter masuk ke permainan.", 0xFFFF6A6A)
+        return
+    end
+    if menuOpen[0] or adminOpen[0] or isOtherUiOpen() then
+        sampAddChatMessage("[PBRP/PKU UI] Tutup menu lain sebelum membuka radial.", 0xFFFF6A6A)
         return
     end
     radialOpen[0] = true
@@ -2287,26 +2321,22 @@ local touchAccessFrame = imgui.OnFrame(
     end,
     function()
         local display = imgui.GetIO().DisplaySize
-        local windowWidth = math.min(330, display.x - 16)
-        local buttonWidth = (windowWidth - 28) / 3
-        local windowHeight = 52
-        imgui.SetNextWindowPos(V2(math.max(8, display.x - windowWidth - 8),
-            math.max(8, display.y * 0.16)), imgui.Cond.Always)
+        local windowWidth = math.min(190, math.max(0, display.x - 16))
+        local buttonWidth = math.max(0, (windowWidth - 12) / 2)
+        local windowHeight = 48
+        local x = math.min(math.max(8, display.x * 0.16), math.max(8, display.x - windowWidth - 8))
+        imgui.SetNextWindowPos(V2(x, 10), imgui.Cond.Always)
         imgui.SetNextWindowSize(V2(windowWidth, windowHeight), imgui.Cond.Always)
         imgui.SetNextWindowBgAlpha(0.82)
         local flags = imgui.WindowFlags.NoDecoration + imgui.WindowFlags.NoMove
             + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoSavedSettings
         imgui.Begin("##pbrp_android_touch_access", nil, flags)
-        if imgui.Button("RP/PKU", V2(buttonWidth, 38)) then
+        if imgui.Button("RP/PKU", V2(buttonWidth, 36)) then
             toggleMenu()
         end
         imgui.SameLine()
-        if imgui.Button("RADIAL", V2(buttonWidth, 38)) then
+        if imgui.Button("RADIAL", V2(buttonWidth, 36)) then
             toggleRadial()
-        end
-        imgui.SameLine()
-        if imgui.Button("ADMIN UI", V2(buttonWidth, 38)) then
-            toggleAdminUi()
         end
         imgui.End()
     end
@@ -2749,55 +2779,7 @@ updateStatus.rollbackFiles = function(applied)
 end
 
 updateStatus.isAllowedPath = function(relativePath)
-    if relativePath == "uijtrp.lua" then return true end
-    local normalizedPath = relativePath:lower()
-    local isModule = normalizedPath:sub(1, 7) == "uijtrp/"
-    local isAsset = normalizedPath:sub(1, 7) == "assets/"
-    local isPhoneAsset = normalizedPath:sub(1, 11) == "jtrp_phone/"
-    if (not isModule and not isAsset and not isPhoneAsset) or relativePath:find("\\", 1, true)
-        or relativePath:find("//", 1, true) or relativePath:find(":", 1, true)
-        or not relativePath:match("^[%w_%.%-/]+$") then
-        return false
-    end
-
-    local segments = {}
-    for segment in normalizedPath:gmatch("[^/]+") do
-        if segment == "." or segment == ".." or segment:sub(1, 1) == "." then
-            return false
-        end
-        segments[#segments + 1] = segment
-    end
-    if #segments < 2 or segments[1] ~= "uijtrp" then return false end
-
-    local extension = segments[#segments]:match("%.([%w]+)$")
-    if not extension then return false end
-
-    if isModule and normalizedPath:sub(1, 11) == "uijtrp/web/" then return false end
-    if extension == "lua" then return true end
-
-    if isPhoneAsset then
-        for _, segment in ipairs(segments) do
-            if segment:find("notif", 1, true)
-                or segment:find("notify", 1, true)
-                or segment:find("ringtone", 1, true) then
-                return false
-            end
-        end
-    end
-
-    local allowedAssetExtensions = {
-        bmp = true,
-        gif = true,
-        jpeg = true,
-        jpg = true,
-        m4a = true,
-        mp3 = true,
-        ogg = true,
-        png = true,
-        webp = true,
-        wav = true,
-    }
-    return allowedAssetExtensions[extension] == true
+    return updaterManifest.isAllowedPath(relativePath)
 end
 
 updateStatus.isValidAsset = function(relativePath, content)
@@ -3128,13 +3110,13 @@ end
 
 function main()
     while not isSampAvailable() do wait(100) end
-    sampAddChatMessage("[PekanBaru UI] Client UI aktif. F2 membuka menu utama; M atau /lradial membuka radial.", 0xFFD4AF37)
+    sampAddChatMessage("[PekanBaru UI] Client UI aktif. F2 membuka menu utama; M, /lradial, atau /radial membuka radial.", 0xFFD4AF37)
     if #loadErrors > 0 then
         sampAddChatMessage("[PBRP/PKU UI] " .. #loadErrors .. " modul gagal dimuat. Lihat moonloader.log atau menu Beranda.", 0xFFFF6A6A)
     end
     sampRegisterChatCommand("rpui", toggleMenu)
     sampRegisterChatCommand("lradial", toggleRadial)
-    sampRegisterChatCommand("adminui", toggleAdminUi)
+    sampRegisterChatCommand("radial", toggleRadial)
     sampRegisterChatCommand("browser", openGameBrowser)
     sampRegisterChatCommand("factioncar", toggleFactionVehicleUi)
     sampRegisterChatCommand("rpuihud", function()
@@ -3200,14 +3182,11 @@ function main()
         wasPlayerSpawned = spawned
         if not (isSampAvailable() and isPlayerUiReady()) then return end
 
-        if wasKeyPressed(0x4D) and not typing and not isOtherUiOpen() then
+        if wasKeyPressed(0x4D) and not typing then
             toggleRadial()
         end
         if wasKeyPressed(0x71) and not typing then
             toggleMenu()
-        end
-        if wasKeyPressed(0x72) and not typing then
-            toggleAdminUi()
         end
         -- pintasan angka 1..9, 0 saat radial terbuka
         if radialOpen[0] and not typing then

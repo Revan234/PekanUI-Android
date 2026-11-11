@@ -94,20 +94,19 @@ return function(imgui, V2, isPlayerUiReady)
 
     local function draw()
         local display = imgui.GetIO().DisplaySize
-        local width = math.min(880, display.x - 36)
-        local height = math.min(760, display.y - 36)
-        if width < 400 or height < 360 then
-            width, height = math.max(320, display.x - 16), math.max(300, display.y - 16)
-        end
+        local width = math.max(300, display.x - 24)
+        local height = math.min(148, math.max(124, display.y * 0.34))
+        local left = (display.x - width) / 2
+        local top = display.y - height - 12
 
-        imgui.SetNextWindowPos(V2((display.x - width) / 2, (display.y - height) / 2), imgui.Cond.Always)
+        imgui.SetNextWindowPos(V2(left, top), imgui.Cond.Always)
         imgui.SetNextWindowSize(V2(width, height), imgui.Cond.Always)
-        imgui.PushStyleVarFloat(imgui.StyleVar.WindowRounding, 14)
-        imgui.PushStyleVarFloat(imgui.StyleVar.WindowBorderSize, 1)
-        imgui.PushStyleVarVec2(imgui.StyleVar.WindowPadding, V2(0, 0))
-        imgui.PushStyleVarFloat(imgui.StyleVar.FrameRounding, 9)
-        imgui.PushStyleVarVec2(imgui.StyleVar.ItemSpacing, V2(10, 10))
-        imgui.PushStyleColor(imgui.Col.WindowBg, P.bg)
+        imgui.PushStyleVarFloat(imgui.StyleVar.WindowRounding, 7)
+        imgui.PushStyleVarFloat(imgui.StyleVar.WindowBorderSize, 0)
+        imgui.PushStyleVarVec2(imgui.StyleVar.WindowPadding, V2(7, 7))
+        imgui.PushStyleVarFloat(imgui.StyleVar.FrameRounding, 4)
+        imgui.PushStyleVarVec2(imgui.StyleVar.ItemSpacing, V2(7, 0))
+        imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.035, 0.035, 0.04, 0.92))
         imgui.PushStyleColor(imgui.Col.Border, P.border)
         imgui.PushStyleColor(imgui.Col.Text, P.text)
         imgui.PushStyleColor(imgui.Col.TextDisabled, P.muted)
@@ -120,52 +119,68 @@ return function(imgui, V2, isPlayerUiReady)
         local dl = imgui.GetWindowDrawList()
         local pos = imgui.GetWindowPos()
         local size = imgui.GetWindowSize()
-        local redLeft = imgui.ImVec4(0.83, 0.08, 0.14, 1)
-        local redRight = imgui.ImVec4(0.39, 0.035, 0.07, 1)
-        dl:AddRectFilledMultiColor(pos, V2(pos.x + size.x, pos.y + 72),
-            colorU32(redLeft), colorU32(redRight), colorU32(redRight), colorU32(redLeft))
-        dl:AddLine(V2(pos.x, pos.y + 72), V2(pos.x + size.x, pos.y + 72), colorU32(P.border), 1)
+        local brandWidth = math.min(142, math.max(96, size.x * 0.25))
+        local brandTop = pos.y + 7
+        local brandBottom = pos.y + size.y - 7
+        local brandColor = imgui.ImVec4(0.0, 0.58, 0.48, 1)
+        dl:AddRectFilled(V2(pos.x + 7, brandTop), V2(pos.x + 7 + brandWidth, brandBottom),
+            colorU32(brandColor), 5)
+        dl:AddRectFilled(V2(pos.x + 7 + brandWidth - 4, brandTop),
+            V2(pos.x + 7 + brandWidth, brandBottom), colorU32(imgui.ImVec4(0.12, 0.88, 0.72, 1)))
 
-        imgui.SetCursorPos(V2(22, 13))
-        imgui.TextColored(imgui.ImVec4(1, 1, 1, 1), "PEKANBARU  /  WORKSHOP")
-        imgui.SetCursorPos(V2(22, 39))
-        imgui.TextColored(imgui.ImVec4(1, 0.82, 0.83, 1), "MECHANIC SERVICE")
-        imgui.SetCursorPos(V2(size.x - 52, 18))
-        if imgui.Button("X##mechanic_service_close", V2(32, 32)) then respond(0, 0) end
+        imgui.SetCursorPos(V2(16, 20))
+        imgui.TextColored(imgui.ImVec4(1, 1, 1, 1), "PBRP")
+        imgui.SetCursorPos(V2(16, 42))
+        imgui.TextColored(imgui.ImVec4(0.82, 1, 0.96, 1), "MECHANIC")
+        imgui.SetCursorPos(V2(16, 59))
+        imgui.TextColored(imgui.ImVec4(0.82, 1, 0.96, 1), "WORKS")
+        imgui.SetCursorPos(V2(16, size.y - 34))
+        imgui.TextColored(imgui.ImVec4(0.82, 1, 0.96, 1), string.format("%02d SERVICES", #items))
+        imgui.SetCursorPos(V2(16 + brandWidth - 38, size.y - 38))
+        if imgui.Button("X##mechanic_service_close", V2(30, 28)) then respond(0, 0) end
 
-        imgui.SetCursorPos(V2(22, 88))
-        imgui.TextColored(P.muted, "PILIH LAYANAN")
-        imgui.SameLine()
-        imgui.SetCursorPosX(size.x - 132)
-        imgui.TextColored(P.muted, string.format("%02d SERVICE", #items))
-        imgui.SetCursorPos(V2(18, 116))
-        imgui.BeginChild("##PBRP_mechanic_service_cards", V2(size.x - 36, size.y - 174), false,
-            imgui.WindowFlags.NoBackground)
+        local cardsX = brandWidth + 18
+        local cardsWidth = size.x - cardsX - 10
+        local cardHeight = size.y - 14
+        local cardWidth = math.min(132, math.max(94, display.x * 0.22))
+        local itemSpacing = 7
+        imgui.SetCursorPos(V2(cardsX, 7))
+        imgui.BeginChild("##PBRP_mechanic_service_cards", V2(cardsWidth, cardHeight), false,
+            imgui.WindowFlags.HorizontalScrollbar)
 
         local cardDrawList = imgui.GetWindowDrawList()
-        local spacing, cardHeight = 12, 76
-        local available = imgui.GetContentRegionAvail().x
-        local columns = available >= 660 and 3 or 2
-        local cardWidth = (available - spacing * (columns - 1)) / columns
         for index, item in ipairs(items) do
-            if (index - 1) % columns ~= 0 then imgui.SameLine(0, spacing) end
+            if index > 1 then imgui.SameLine(0, itemSpacing) end
             pushId(index)
-            imgui.PushStyleColor(imgui.Col.Button, P.card)
+            imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.055, 0.055, 0.065, 1))
             imgui.PushStyleColor(imgui.Col.ButtonHovered, P.cardHover)
             imgui.PushStyleColor(imgui.Col.ButtonActive, P.red)
-            imgui.PushStyleColor(imgui.Col.Border, P.border)
+            imgui.PushStyleColor(imgui.Col.Border, imgui.ImVec4(0.14, 0.14, 0.16, 1))
             imgui.PushStyleVarFloat(imgui.StyleVar.FrameBorderSize, 1)
-            local clicked = imgui.Button("##service_card", V2(cardWidth, cardHeight))
+            imgui.PushStyleVarFloat(imgui.StyleVar.FrameRounding, 3)
+            local clicked = imgui.Button("##service_card", V2(cardWidth, cardHeight - 4))
             local cardPos = imgui.GetItemRectMin()
             local cardMax = imgui.GetItemRectMax()
             local hovered = imgui.IsItemHovered()
-            local accent = hovered and P.redHover or P.red
-            cardDrawList:AddRectFilled(V2(cardPos.x + 1, cardPos.y + 9),
-                V2(cardPos.x + 4, cardMax.y - 9), colorU32(accent), 2)
-            cardDrawList:AddText(V2(cardPos.x + 14, cardPos.y + 13), colorU32(P.text), item.name)
-            cardDrawList:AddText(V2(cardPos.x + 14, cardPos.y + 40), colorU32(P.gold),
-                item.requirement ~= "" and item.requirement or "Layanan mekanik")
-            imgui.PopStyleVar()
+            local accent = hovered and imgui.ImVec4(0.12, 0.88, 0.72, 1) or brandColor
+            local centerX = cardPos.x + cardWidth / 2
+            cardDrawList:AddRectFilled(V2(cardPos.x + 1, cardPos.y + 1),
+                V2(cardMax.x - 1, cardPos.y + 3), colorU32(accent), 1)
+            cardDrawList:AddText(V2(cardMax.x - 43, cardPos.y + 7), colorU32(P.gold),
+                item.requirement ~= "" and item.requirement or "SERVICE")
+            cardDrawList:AddCircle(V2(centerX, cardPos.y + 37), 14, colorU32(P.muted), 8, 2)
+            cardDrawList:AddCircle(V2(centerX, cardPos.y + 37), 5, colorU32(accent), 8, 2)
+            cardDrawList:AddLine(V2(centerX - 10, cardPos.y + 27),
+                V2(centerX - 15, cardPos.y + 22), colorU32(P.text), 3)
+            cardDrawList:AddLine(V2(centerX + 10, cardPos.y + 27),
+                V2(centerX + 15, cardPos.y + 22), colorU32(P.text), 3)
+            cardDrawList:AddLine(V2(centerX - 10, cardPos.y + 47),
+                V2(centerX - 15, cardPos.y + 52), colorU32(P.text), 3)
+            cardDrawList:AddLine(V2(centerX + 10, cardPos.y + 47),
+                V2(centerX + 15, cardPos.y + 52), colorU32(P.text), 3)
+            cardDrawList:AddText(V2(cardPos.x + 8, cardMax.y - 27), colorU32(P.text),
+                item.name:sub(1, 20))
+            imgui.PopStyleVar(2)
             imgui.PopStyleColor(4)
             if imgui.PopID then imgui.PopID() end
             if clicked then
@@ -174,12 +189,6 @@ return function(imgui, V2, isPlayerUiReady)
             end
         end
         imgui.EndChild()
-
-        imgui.SetCursorPos(V2(18, size.y - 48))
-        imgui.TextDisabled("Pilih kartu untuk memulai layanan kendaraan.")
-        imgui.SameLine()
-        imgui.SetCursorPosX(size.x - 137)
-        if imgui.Button("BATAL##mechanic_service_cancel", V2(119, 32)) then respond(0, 0) end
         imgui.End()
 
         imgui.PopStyleColor(4)
